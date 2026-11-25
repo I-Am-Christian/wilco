@@ -1,0 +1,7 @@
+const CACHE='wilco-vice-app-v4';
+const BASE=new URL('./',self.location.href);
+const LOCAL=['vice-vibes.html','arcade-menu.css','arcade-menu.js','multiplayer.js','vice.webmanifest','vice-icon.svg'].map(p=>new URL(p,BASE).href);
+const ENGINE=['https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js','https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/objects/Reflector.js','https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/geometries/RoundedBoxGeometry.js'];
+self.addEventListener('install',e=>{e.waitUntil((async()=>{const c=await caches.open(CACHE);await Promise.allSettled([...LOCAL,...ENGINE].map(async url=>{let r=await fetch(url,{cache:'reload'});if(r.ok)await c.put(url,r)}));await self.skipWaiting()})())});
+self.addEventListener('activate',e=>e.waitUntil((async()=>{for(let k of await caches.keys())if(k.startsWith('wilco-vice-app-')&&k!==CACHE)await caches.delete(k);await self.clients.claim()})()));
+self.addEventListener('fetch',e=>{let req=e.request;if(req.method!=='GET')return;let u=new URL(req.url),plain=u.origin+u.pathname,game=plain===LOCAL[0],local=LOCAL.includes(plain),engine=ENGINE.includes(req.url);if(!game&&!local&&!engine)return;e.respondWith((async()=>{let c=await caches.open(CACHE);if(engine){let hit=await c.match(req);if(hit)return hit}try{let r=await fetch(req);if(r.ok)await c.put(game?LOCAL[0]:req,r.clone());return r}catch(err){let hit=await c.match(game?LOCAL[0]:req);if(hit)return hit;throw err}})())});
