@@ -60,8 +60,14 @@ vec3 grass=mix(vec3(.065,.31,.14),vec3(.35,.57,.10),grassPatch);
 grass*=.85+.15*diffuseColor.r;
 vec3 sand=mix(vec3(.79,.52,.31),vec3(1.,.82,.53),.5+.5*sin(vP.x*.34+vP.y*.5));
 sand*=.97+.03*sin(vP.x*19.+vP.y*13.);
-diffuseColor.rgb=mix(grass,sand,pathMask);`);
-};valleyGroundMat.customProgramCacheKey=()=> 'painted-valley-v1';
+float candyTrail=1.-smoothstep(3.8,4.3,dW);
+float lane=clamp((vP.x-west+4.3)/8.6,0.,.999);
+vec3 rainbowLane=.59+.29*cos(6.28318*(floor(lane*7.)/7.+vec3(0.,.67,.33)));
+float laneEdge=1.-smoothstep(.035,.09,min(fract(lane*7.),1.-fract(lane*7.)));
+rainbowLane=mix(rainbowLane,vec3(.94,.86,.78),laneEdge*.43);
+float candyZone=smoothstep(-45.,5.,vP.y);
+diffuseColor.rgb=mix(mix(grass,sand,pathMask),rainbowLane,candyTrail*candyZone);`);
+};valleyGroundMat.customProgramCacheKey=()=> 'painted-valley-candy-v2';
 const riverMat=new THREE.ShaderMaterial({uniforms:{t:{value:0},night:{value:0}},vertexShader:'varying vec2 uvv;void main(){uvv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'varying vec2 uvv;uniform float t,night;void main(){float wave=sin(uvv.y*330.+uvv.x*9.-t*2.)*.5+sin(uvv.x*43.+uvv.y*160.+t)*.5;vec3 a=mix(vec3(.05,.43,.60),vec3(.08,.008,.016),night);vec3 b=mix(vec3(.37,.91,.94),vec3(.49,.045,.052),night);vec3 col=mix(a,b,smoothstep(.65,.98,wave)*.38);gl_FragColor=vec4(col,1.);}'});
 let river=new THREE.Mesh(new THREE.PlaneGeometry(18.3,320),riverMat);river.rotation.x=-Math.PI/2;river.position.y=-.45;scene.add(river);
 // Floating island: the surface retains its exact 320 x 320 dimensions.
@@ -171,9 +177,14 @@ function updateCabin(dt){if(state.houseExit>0){state.houseExit+=dt;innerDoor.rot
  if(len>.05){let k=Math.min(1,len)/len*3.2*dt;p.x=clamp(p.x+(Math.sin(p.yaw)*f-Math.cos(p.yaw)*s)*k,cabin.x-2.12,cabin.x+2.12);p.z=clamp(p.z+(Math.cos(p.yaw)*f+Math.sin(p.yaw)*s)*k,cabin.z-1.92,cabin.z+1.98)}
  p.stamina=100;p.y=0;cabinLamp.intensity=14+Math.sin(state.time*7)*.5;hud()
 }
-function unicorn(scale,x,y,z,parent,main=false){let g=new THREE.Group();parent.add(g);g.position.set(x,y,z);g.scale.setScalar(scale);let white=mat(0xfff5ec,.55),mane=mat(main?0xe78fd0:0xc7a0ee);ball(white,0,1.7,0,.8,.83,1.55,g);ball(white,0,2.55,1.02,.49,.94,.52,g);ball(white,0,3.12,1.47,.56,.54,.75,g);ball(0xffe5e9,0,2.94,1.91,.46,.35,.47,g);for(let q of [-1,1]){let ear=mesh(coneGeo,white,q*.34,3.66,1.25,.18,.56,.18,g);ear.rotation.z=-q*.22;ball(0x403158,q*.44,3.22,1.73,.09,.10,.10,g);ball(0xffffff,q*.45,3.25,1.78,.032,.035,.035,g);ball(0xf8aec3,q*.4,2.96,1.88,.11,.08,.08,g);for(let k of [-1,1]){rod(white,v(q*.48,1.48,k*.85),v(q*.48,.30,k*.90),.19,g);ball(0xc4a0bd,q*.48,.22,k*.90,.25,.22,.29,g)}}
+function unicorn(scale,x,y,z,parent,main=false){let g=new THREE.Group();parent.add(g);g.position.set(x,y,z);g.scale.setScalar(scale);let white=mat(0xfff7fa,.36),mane=mat(main?0xe78fd0:0xc7a0ee);ball(white,0,1.7,0,.8,.83,1.55,g);ball(white,0,2.55,1.02,.49,.94,.52,g);ball(white,0,3.12,1.47,.56,.54,.75,g);ball(0xffe5e9,0,2.94,1.91,.46,.35,.47,g);for(let q of [-1,1]){let ear=mesh(coneGeo,white,q*.34,3.66,1.25,.18,.56,.18,g);ear.rotation.z=-q*.22;ball(0x403158,q*.44,3.22,1.73,.09,.10,.10,g);ball(0xffffff,q*.45,3.25,1.78,.032,.035,.035,g);ball(0xf8aec3,q*.4,2.96,1.88,.11,.08,.08,g);for(let k of [-1,1]){rod(white,v(q*.48,1.48,k*.85),v(q*.48,.30,k*.90),.19,g);ball(0xc4a0bd,q*.48,.22,k*.90,.25,.22,.29,g)}}
 let horn=mesh(coneGeo,glow(0xffd77b,.7),0,3.93,1.67,.15,.93,.15,g);horn.rotation.x=.20;for(let i=0;i<7;i++)ball([0xf3a8c4,0xffdc94,0xc5a4ed,0x9ed9e1][i%4],.12,3.50-i*.25,1.02-i*.035,.45,.32,.40,g);
-tube([[0,1.9,-1.3],[.5,1.45,-2],[.36,.64,-2.2],[-.10,.48,-2.35]],.25,mane,g);if(main){let crown=mesh(coneGeo,glow(0xffe6ac,.6),0,3.66,.93,.43,.36,.43,g);crown.rotation.x=Math.PI;let heart=ball(glow(0xff83b4,.7),0,2.18,1.49,.23,.25,.12,g)}
+// Flowing pastel locks and tail ribbons, rather than a single rigid tail.
+const lockColors=[0xf1b6d6,0xb1dce7,0xd0c2f1,0xffe7dd,0xa8c9de];
+for(let i=0;i<5;i++){let k=i-2,offset=k*.085,c=mat(lockColors[i],.54);
+tube([[offset,3.57,1.31],[.13+offset,3.34,.76],[.32+offset,2.92,.46],[.43+offset,2.63,.04],[.23+offset,2.26,-.20]],.105,c,g,20);
+tube([[offset,1.99,-1.29],[.44+offset,1.89,-1.78],[.62+offset,1.28,-2.25],[.35+offset,.77,-2.43],[-.13+offset,.47,-2.72]],.105,c,g,22)}
+tube([[0,1.9,-1.3],[.5,1.45,-2],[.36,.64,-2.2],[-.10,.48,-2.35]],.22,mane,g);if(main){let crown=mesh(coneGeo,glow(0xffe6ac,.6),0,3.66,.93,.43,.36,.43,g);crown.rotation.x=Math.PI;let heart=ball(glow(0xff83b4,.7),0,2.18,1.49,.23,.25,.12,g)}
 return g}
 const aurora=unicorn(3.2,unicornSpot.x,terrainY(unicornSpot.x,unicornSpot.z),unicornSpot.z,happy,true);aurora.rotation.y=.55;
 for(let i=0;i<10;i++){let x=range(-140,140),z=range(-140,140);if(Math.abs(x)<15)continue;let u=unicorn(range(.7,1.0),x,terrainY(x,z),z,happy);u.rotation.y=range(0,TAU)}
@@ -193,6 +204,30 @@ const caneMats=caneColors.map(c=>new THREE.MeshPhysicalMaterial({map:makeCandyTe
 const caneSites=[];for(let i=0;i<400&&caneSites.length<180;i++){let x=i<28?-130+candyRange(-17,22):candyRange(-145,145),z=i<28?110+candyRange(-22,18):candyRange(-145,145);if(Math.abs(x)<14||Math.abs(x)>147||Math.abs(z)>147||dist({x,z},startSpot)<3||dist({x,z},unicornSpot)<9||dist({x,z},{x:-88,z:-11})<6||isHole(x,z)||trees.some(t=>Math.hypot(x-t.x,z-t.z)<t.r+1.5)||caneSites.some(t=>Math.hypot(x-t.x,z-t.z)<3.1))continue;caneSites.push({x,z,scale:candyRange(.75,1.65),angle:candyRange(0,TAU),kind:i%4})}
 const caneDummy=new THREE.Object3D();for(let k=0;k<caneMats.length;k++){let sites=caneSites.filter(t=>t.kind===k),batch=new THREE.InstancedMesh(caneGeo,caneMats[k],sites.length);sites.forEach((t,i)=>{caneDummy.position.set(t.x,terrainY(t.x,t.z),t.z);caneDummy.rotation.set(0,t.angle,0);caneDummy.scale.setScalar(t.scale);caneDummy.updateMatrix();batch.setMatrixAt(i,caneDummy.matrix)});batch.instanceMatrix.needsUpdate=true;batch.computeBoundingSphere();batch.receiveShadow=true;candyLand.add(batch)}
 // A perimeter of layered pink, lavender and cream stone; all ridges are OUTSIDE the safe walking boundary.
+// Peppermint groves and sugar meadows blend into the existing blossom-covered valley.
+let sweetSeed=148013;function sweetRandom(){sweetSeed=(Math.imul(sweetSeed,1664525)+1013904223)>>>0;return sweetSeed/4294967296}const sweetRange=(a,b)=>a+(b-a)*sweetRandom();
+const sweetPalette=[['#f8cbdf','#c970a8'],['#ffdfbc','#d9858c'],['#b9e7e8','#5caeaf'],['#ddd0f5','#a27bc1'],['#fff1d1','#e3b56d']];
+function swirlTexture(pair){let c=document.createElement('canvas');c.width=c.height=256;let ctx=c.getContext('2d'),data=ctx.createImageData(256,256),light=new THREE.Color(pair[0]),dark=new THREE.Color(pair[1]);light.convertLinearToSRGB();dark.convertLinearToSRGB();
+ for(let j=0;j<256;j++)for(let i=0;i<256;i++){let x=(i-127.5)/127.5,y=(j-127.5)/127.5,r=Math.hypot(x,y),a=Math.atan2(y,x),w=.5+.5*Math.cos(a*2+20*r),t=.5+.5*Math.tanh((w-.44)*7),shade=.91+.09*Math.sin(r*26)+.10*(1-r),k=(j*256+i)*4;data.data[k]=Math.min(255,(dark.r+(light.r-dark.r)*t)*shade*255);data.data[k+1]=Math.min(255,(dark.g+(light.g-dark.g)*t)*shade*255);data.data[k+2]=Math.min(255,(dark.b+(light.b-dark.b)*t)*shade*255);data.data[k+3]=255}ctx.putImageData(data,0,0);let t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());return t}
+const sweetMats=sweetPalette.map(p=>new THREE.MeshPhysicalMaterial({map:swirlTexture(p),roughness:.34,clearcoat:.65,clearcoatRoughness:.26}));
+const popGeo=new THREE.CylinderGeometry(1,1,.22,24);popGeo.rotateX(Math.PI/2);
+const sugarGeo=new THREE.SphereGeometry(1,16,12),sugarDummy=new THREE.Object3D();
+function sweetBatch(geo,material,items){if(!items.length)return;let b=new THREE.InstancedMesh(geo,material,items.length);items.forEach((q,i)=>{sugarDummy.position.set(q[0],q[1],q[2]);sugarDummy.rotation.set(q[6]||0,q[7]||0,q[8]||0);sugarDummy.scale.set(q[3],q[4],q[5]);sugarDummy.updateMatrix();b.setMatrixAt(i,sugarDummy.matrix)});b.instanceMatrix.needsUpdate=true;b.computeBoundingSphere();b.receiveShadow=true;candyLand.add(b)}
+const popSites=sweetPalette.map(()=>[]),swirlCrowns=sweetPalette.map(()=>[]),sugarSticks=[],sugarBerries=sweetPalette.map(()=>[]);
+function candyClear(x,z,r=2){return Math.abs(x)>15&&Math.abs(x)<149&&Math.abs(z)<149&&!isHole(x,z)&&dist({x,z},startSpot)>3&&dist({x,z},unicornSpot)>10&&dist({x,z},{x:-88,z:-11})>5&&paintedPathDistance(x,z)>r&&!trees.some(t=>Math.hypot(x-t.x,z-t.z)<t.r+r)}
+const sweetTreeSites=[];
+for(let i=0;i<340&&sweetTreeSites.length<56;i++){let z=sweetRange(-95,145),west=-82+23*Math.sin(z*.027)+9*Math.cos(z*.056),x=i%3===0?sweetRange(20,143):west+(i%2?1:-1)*sweetRange(9,39);if(!candyClear(x,z,6)||sweetTreeSites.some(t=>Math.hypot(x-t.x,z-t.z)<9))continue;sweetTreeSites.push({x,z});let y=terrainY(x,z),h=sweetRange(4.2,7.5),k=i%5;sugarSticks.push([x,y+h*.45,z,.32,h*.90,.32,0,0,.055]);
+ for(let j=0;j<11;j++){let a=j*2.399963,r=j? sweetRange(.5,2.1):0,hh=sweetRange(-.85,1.15),size=sweetRange(.85,1.65);swirlCrowns[(k+j%3)%5].push([x+Math.sin(a)*r,y+h+hh,z+Math.cos(a)*r,size,size*.93,size,.1,a,0])}}
+for(let i=0;i<520&&popSites.reduce((a,b)=>a+b.length,0)<240;i++){let z=sweetRange(-130,147),west=-82+23*Math.sin(z*.027)+9*Math.cos(z*.056),x=i%3===0?sweetRange(20,143):west+(i%2?1:-1)*sweetRange(5.4,24);if(!candyClear(x,z,3)||sweetTreeSites.some(t=>Math.hypot(x-t.x,z-t.z)<3.5))continue;let y=terrainY(x,z),h=sweetRange(1.35,4.0),size=sweetRange(.42,1.05),k=i%5;sugarSticks.push([x,y+h*.47,z,.085,h*.94,.085,0,0,0]);popSites[k].push([x,y+h,z,size,size,size,0,sweetRange(0,TAU),0])}
+for(let i=0;i<780;i++){let z=sweetRange(-40,148),west=-82+23*Math.sin(z*.027)+9*Math.cos(z*.056),x=west+(i%2?1:-1)*sweetRange(5.2,30);if(!candyClear(x,z,4))continue;let y=terrainY(x,z);for(let j=0;j<4;j++){let xx=x+sweetRange(-1.1,1.1),zz=z+sweetRange(-1.1,1.1),size=sweetRange(.12,.48);if(paintedPathDistance(xx,zz)>4.8)sugarBerries[(i+j)%5].push([xx,terrainY(xx,zz)+size*.45,zz,size,size*.74,size,0,0,0])}}
+sweetBatch(cylGeo,new THREE.MeshStandardMaterial({color:0xffede6,roughness:.66}),sugarSticks);
+for(let k=0;k<5;k++){sweetBatch(popGeo,sweetMats[k],popSites[k]);sweetBatch(sugarGeo,sweetMats[k],swirlCrowns[k]);sweetBatch(sugarGeo,new THREE.MeshPhysicalMaterial({color:sweetPalette[k][0],roughness:.40,clearcoat:.45}),sugarBerries[k])}
+// Floating candy planets and fluffy banks of peach, cream and lilac clouds.
+const sweetSky=new THREE.Group();happy.add(sweetSky);
+const cloudPuffs=[[],[],[]],cloudPuffGeo=new THREE.SphereGeometry(1,12,8),cloudPuffMats=[0xffdedb,0xffeee1,0xe2d4ed].map(c=>new THREE.MeshStandardMaterial({color:c,roughness:1}));
+for(let i=0;i<120;i++){let a=sweetRange(0,TAU),r=sweetRange(105,430),x=Math.sin(a)*r,z=Math.cos(a)*r,y=sweetRange(48,116),sc=sweetRange(2.5,6.5);for(let j=0;j<9;j++){let ang=j*2.4,rr=j?sc*sweetRange(.2,2.1):0,sz=sc*sweetRange(.65,1.3);cloudPuffs[i%3].push([x+Math.cos(ang)*rr,y+sweetRange(-sc*.25,sc*.7),z+Math.sin(ang)*rr,sz,sz*.83,sz,0,0,0])}}
+for(let k=0;k<3;k++){let list=cloudPuffs[k],b=new THREE.InstancedMesh(cloudPuffGeo,cloudPuffMats[k],list.length);list.forEach((q,i)=>{sugarDummy.position.set(q[0],q[1],q[2]);sugarDummy.rotation.set(0,0,0);sugarDummy.scale.set(q[3],q[4],q[5]);sugarDummy.updateMatrix();b.setMatrixAt(i,sugarDummy.matrix)});b.instanceMatrix.needsUpdate=true;b.computeBoundingSphere();sweetSky.add(b)}
+for(let i=0;i<5;i++){let a=i*1.72+.5;ball(new THREE.MeshStandardMaterial({color:[0xe9add2,0xd9c5ef,0xf9cdbd,0xb7e3df,0xf7d3e0][i],roughness:.85,emissive:0x4e283e,emissiveIntensity:.18,fog:false}),Math.cos(a)*310,85+i*18,Math.sin(a)*310,8+i*1.3,8+i*1.3,8+i*1.3,sweetSky,false)}
 const candyRim=[],candyRockPos=[],candyRockCol=[],candyRockIdx=[];
 const cliffN=160;for(let i=0;i<cliffN;i++){let side=Math.floor(i/40),t=-160+(i%40)*8;candyRim.push(side===0?[t,-160]:side===1?[160,t]:side===2?[-t,160]:[-160,-t])}
 function candyCliffHeight(x,z){return 40+10*Math.sin(x*.047+z*.038)+9*Math.cos(x*.081-z*.056)+4*Math.sin(x*.23+z*.19)}
@@ -215,7 +250,7 @@ void main(){q=uv;vec4 mvPosition=modelViewMatrix*vec4(position,1.);gl_Position=p
 }`,fragmentShader:`varying vec2 q;uniform float time;
 #include <fog_pars_fragment>
 vec3 rainbow(float x){return .60+.40*cos(6.28318*(x+vec3(0.,.67,.33)));}
-void main(){float stripe=q.x+.025*sin(q.y*32.+time*1.8);vec3 color=rainbow(stripe*.93);float ripple=sin(q.y*115.+time*8.+sin(q.x*58.)*1.8)*.5+.5;float streak=smoothstep(.55,.96,sin(q.x*190.+sin(q.y*29.+time*2.))*.5+.5);float edge=smoothstep(0.,.05,q.x)*smoothstep(1.,.95,q.x);color=mix(color,vec3(1.,.96,.98),.15+.25*ripple+.18*streak);gl_FragColor=vec4(color,edge*(.78+.17*ripple));
+void main(){float stripe=q.x+.025*sin(q.y*32.+time*1.8);vec3 color=rainbow(stripe*.93);float ripple=sin(q.y*115.+time*8.+sin(q.x*58.)*1.8)*.5+.5;float streak=smoothstep(.55,.96,sin(q.x*190.+sin(q.y*29.+time*2.))*.5+.5);float edge=smoothstep(0.,.05,q.x)*(1.-smoothstep(.95,1.,q.x));color=mix(color,vec3(1.,.96,.98),.15+.25*ripple+.18*streak);gl_FragColor=vec4(color,edge*(.78+.17*ripple));
 #include <fog_fragment>
 #include <colorspace_fragment>
 }`});
@@ -227,7 +262,7 @@ for(let [x,z] of fallSpecs){let g=new THREE.Group();candyLand.add(g);let nx=Math
  for(let j=0;j<rows;j++)for(let k=0;k<cols;k++){let a=j*(cols+1)+k,b=a+1,c=a+cols+1,d=c+1;ind.push(a,b,c,b,d,c)}
  let geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geo.setIndex(ind);let sheet=new THREE.Mesh(geo,rainbowFallMat);g.add(sheet);
  let spray=[];for(let i=0;i<14;i++){let m=ball(splashMat,candyRange(-5.8,5.8),candyRange(.25,1.35),candyRange(1.3,3.8),candyRange(.5,1.35),.32,candyRange(.45,1.05),g,false);spray.push({m,x:m.position.x,y:m.position.y,z:m.position.z,phase:candyRange(0,TAU)})}rainbowFalls.push({g,x,z,spray})}
-function updateCandyland(t,p){rainbowFallMat.uniforms.time.value=t;for(let f of rainbowFalls){f.g.visible=Math.hypot(p.x-f.x,p.z-f.z)<175;if(f.g.visible)for(let o of f.spray){o.m.position.y=o.y+Math.sin(t*2.7+o.phase)*.25;o.m.position.x=o.x+Math.sin(t*1.9+o.phase)*.35}}}
+function updateCandyland(t,p){sweetSky.rotation.y=Math.sin(t*.025)*.035;rainbowFallMat.uniforms.time.value=t;for(let f of rainbowFalls){f.g.visible=Math.hypot(p.x-f.x,p.z-f.z)<175;if(f.g.visible)for(let o of f.spray){o.m.position.y=o.y+Math.sin(t*2.7+o.phase)*.25;o.m.position.x=o.x+Math.sin(t*1.9+o.phase)*.35}}}
 
 // Soft peach-to-cyan sky, golden sunlight and procedural pastel cloud banks.
 const valleySky=new THREE.Mesh(new THREE.SphereGeometry(600,40,24),new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,fog:false,uniforms:{time:{value:0}},vertexShader:`varying vec3 skyDirection;void main(){skyDirection=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`varying vec3 skyDirection;uniform float time;
