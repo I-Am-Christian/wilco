@@ -1,7 +1,7 @@
 /* Wilco Arcade public-code multiplayer via Supabase Realtime. No persisted account or private data. */
 (function(){
 "use strict";
-const URL="https://ixgwaicfrltbgvyctnvp.supabase.co",KEY="sb_publishable_aXkhfzVaTCWWgql7L9WOYQ_OtPAUwXz",CDN="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js";
+const URL="https://ixgwaicfrltbgvyctnvp.supabase.co",KEY="sb_publishable_aXkhfzVaTCWWgql7L9WOYQ_OtPAUwXz",CDN="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2";
 function seed(text){let h=2166136261;for(let c of String(text)){h=Math.imul(h^c.charCodeAt(0),16777619)}return h>>>0}
 function rng(value){let a=seed(value);return ()=>{a=(a+0x6D2B79F5)>>>0;let t=Math.imul(a^(a>>>15),1|a);t^=t+Math.imul(t^(t>>>7),61|t);return ((t^(t>>>14))>>>0)/4294967296}}
 function randomCode(){let a=new Uint8Array(8);crypto.getRandomValues(a);return Array.from(a,x=>x.toString(16).padStart(2,"0")).join("").toUpperCase()}
@@ -25,7 +25,7 @@ function mount(game,hooks){
  catch(e){if(token!==epoch)return;joining=false;lastError=String(e.message||e).slice(0,120);updateStatus()}}
  q(".mp-create").onclick=()=>join(randomCode());q(".mp-join").onclick=()=>join(code.value);q(".mp-leave").onclick=()=>{lastError="";leave()};q(".mp-copy").onclick=async()=>{let url=new URL(location.href);url.searchParams.set("room",room);try{await navigator.clipboard.writeText(url.href);status.textContent="Invite copied · "+room}catch{status.textContent="Room code: "+room}};
  addEventListener("pagehide",()=>{if(channel&&ready)channel.send({type:"broadcast",event:"leave",payload:{id}});if(channel&&client)client.removeChannel(channel)});
- function tick(now){if(now-lastStatus>1000){lastStatus=now;for(let [key,p] of peers)if(now-p.seen>6500){peers.delete(key);hooks.remove?.(key)}updateStatus()}if(!ready||!channel||now-lastSend<180)return;lastSend=now;let state=hooks.snapshot();if(!state)return;channel.send({type:"broadcast",event:"player",payload:{id,name,seq:++seq,state}}).catch(()=>{})}
+ function tick(now){if(now-lastStatus>1000){lastStatus=now;for(let [key,p] of peers)if(now-p.seen>6500){peers.delete(key);hooks.remove?.(key)}updateStatus()}if(!ready||!channel||now-lastSend<200)return;lastSend=now;let state=hooks.snapshot();if(!state)return;channel.send({type:"broadcast",event:"player",payload:{id,name,seq:++seq,state}}).catch(()=>{})}
  updateStatus();return {tick,peers,get room(){return ready?room:""},get connected(){return ready},leave};
 }
 window.WilcoMP={mount,rng,seed};
