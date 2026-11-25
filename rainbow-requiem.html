@@ -46,14 +46,15 @@ function texture(dark){let c=document.createElement('canvas');c.width=c.height=2
 let uv=[];for(let i=0;i<vertices.length;i+=3)uv.push((vertices[i]+160)/320,(vertices[i+2]+160)/320);terrainGeo.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));
 const happyTex=texture(false),darkTex=texture(true),terrainMat=new THREE.MeshStandardMaterial({map:happyTex,vertexColors:true,roughness:.97}),land=new THREE.Mesh(terrainGeo,terrainMat);land.receiveShadow=true;scene.add(land);safeGroundGeo.setAttribute('uv',terrainGeo.attributes.uv);safeGroundGeo.setAttribute('normal',terrainGeo.attributes.normal);const safeGround=new THREE.Mesh(safeGroundGeo,terrainMat);safeGround.receiveShadow=true;happy.add(safeGround);
 // Painted fantasy palette for the peaceful phase only.
-const valleyGroundMat=new THREE.MeshStandardMaterial({map:happyTex,vertexColors:true,roughness:1});
+const valleyGroundMat=new THREE.MeshStandardMaterial({map:happyTex,vertexColors:true,roughness:1,transparent:false,opacity:1,depthWrite:true,depthTest:true,side:THREE.DoubleSide});
 valleyGroundMat.onBeforeCompile=shader=>{
 shader.vertexShader='varying vec3 valleyWorld;\n'+shader.vertexShader.replace('#include <project_vertex>','valleyWorld=(modelMatrix*vec4(transformed,1.)).xyz;\n#include <project_vertex>');
 shader.fragmentShader='varying vec3 valleyWorld;\n'+shader.fragmentShader.replace('#include <map_fragment>',`#include <map_fragment>
 vec2 vP=valleyWorld.xz;
 float west=-82.+23.*sin(vP.y*.027)+9.*cos(vP.y*.056);
 float east=75.+24.*sin(vP.y*.024+1.7);
-float trail=min(min(abs(vP.x-west),abs(vP.x-east)),abs(vP.y-3.*sin(vP.x*.06)));
+float dW=abs(vP.x-west);
+float trail=min(min(dW,abs(vP.x-east)),abs(vP.y-3.*sin(vP.x*.06)));
 float pathMask=1.-smoothstep(2.1,3.5,trail+.40*sin(vP.x*1.8+vP.y*.9));
 float grassPatch=.5+.5*sin(vP.x*.077+sin(vP.y*.075)*1.9)*cos(vP.y*.09);
 vec3 grass=mix(vec3(.065,.31,.14),vec3(.35,.57,.10),grassPatch);
@@ -67,7 +68,7 @@ float laneEdge=1.-smoothstep(.035,.09,min(fract(lane*7.),1.-fract(lane*7.)));
 rainbowLane=mix(rainbowLane,vec3(.94,.86,.78),laneEdge*.43);
 float candyZone=smoothstep(-45.,5.,vP.y);
 diffuseColor.rgb=mix(mix(grass,sand,pathMask),rainbowLane,candyTrail*candyZone);`);
-};valleyGroundMat.customProgramCacheKey=()=> 'painted-valley-candy-v2';
+};valleyGroundMat.customProgramCacheKey=()=> 'painted-valley-candy-v3';
 // Reference-inspired charcoal earth and crimson moss.
 const cursedGroundMat=new THREE.MeshStandardMaterial({map:darkTex,vertexColors:true,roughness:.91});
 cursedGroundMat.onBeforeCompile=shader=>{
