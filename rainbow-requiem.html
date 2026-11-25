@@ -174,8 +174,41 @@ box(0x49434b,-1.1,.08,-.8,1.4,.15,1.5,g);box(0x9a806b,-1.1,.18,-.8,.55,.08,.10,g
 // so outside terrain, monsters, fog, moon and third-person camera cannot leak through walls.
 const cabin={x:respawnSpot.x,z:respawnSpot.z,halfX:2.6,halfZ:2.35,exitZ:3.65};
 const cabinExterior=new THREE.Group();cabinExterior.position.set(cabin.x,0,cabin.z);horror.add(cabinExterior);
-const cabinWood=mat(0x3a2824),cabinTrim=mat(0x241c1b),cabinStone=mat(0x51423a),cabinDoorMat=mat(0x201717),cabinMetal=mat(0x887357,.36);
-function cabinShell(parent,interior=false){let wood=interior?mat(0x594437):cabinWood;
+// Crooked woodland cottage, based on the supplied gothic house reference.
+let hutSeed=126987;function hutRand(){hutSeed=(Math.imul(hutSeed,1664525)+1013904223)>>>0;return hutSeed/4294967296}
+const hutRange=(a,b)=>a+(b-a)*hutRand();
+function hutWoodTexture(){let c=document.createElement('canvas');c.width=128;c.height=256;let g=c.getContext('2d');g.fillStyle='#5b454d';g.fillRect(0,0,128,256);for(let i=0;i<280;i++){let x=hutRand()*128,w=hutRange(.35,2.4);g.beginPath();g.moveTo(x,0);g.bezierCurveTo(x+hutRange(-9,9),85,x+hutRange(-9,9),170,x+hutRange(-3,3),256);g.strokeStyle=i%3===0?'#8d6970':'#2d222d';g.globalAlpha=hutRange(.15,.6);g.lineWidth=w;g.stroke()}g.globalAlpha=1;let tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;return tex}
+const hutGrain=hutWoodTexture(),cabinWood=new THREE.MeshStandardMaterial({color:0x75646b,map:hutGrain,roughness:.94,bumpMap:hutGrain,bumpScale:.055}),cabinTrim=mat(0x241c2b),cabinStone=mat(0x494047),cabinDoorMat=new THREE.MeshStandardMaterial({color:0x4c383d,map:hutGrain,roughness:1}),cabinMetal=mat(0x9b7852,.36);
+const hutShingleMats=[0x514153,0x3d3446,0x625064,0x332d3b,0x443749].map(c=>new THREE.MeshStandardMaterial({color:c,map:hutGrain,roughness:.93,bumpMap:hutGrain,bumpScale:.04,side:THREE.DoubleSide}));
+function hutFace(pts,material,parent){let geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pts.flat(),3));geo.setAttribute('uv',new THREE.Float32BufferAttribute(pts.length===3?[0,0,1,0,.5,1]:[0,0,1,0,1,1,0,1],2));geo.setIndex(pts.length===3?[0,1,2]:[0,1,2,0,2,3]);geo.computeVertexNormals();let m=new THREE.Mesh(geo,material);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m}
+function hutArch(w,h){let shape=new THREE.Shape();shape.moveTo(-w/2,0);shape.lineTo(w/2,0);shape.lineTo(w/2,h*.58);shape.quadraticCurveTo(w*.49,h*.83,0,h);shape.quadraticCurveTo(-w*.49,h*.83,-w/2,h*.58);shape.closePath();return shape}
+function hutWindow(parent,x,y,z,w,h){let g=new THREE.Group();g.position.set(x,y,z);parent.add(g);
+ let outer=new THREE.Mesh(new THREE.ShapeGeometry(hutArch(w+.22,h+.16)),new THREE.MeshStandardMaterial({color:0x211923,side:THREE.DoubleSide}));outer.position.y=-.08;g.add(outer);
+ // Solid luminous decorative panels: not transparent windows.
+ let panel=new THREE.Mesh(new THREE.ShapeGeometry(hutArch(w,h)),new THREE.MeshBasicMaterial({color:0xff633e,side:THREE.DoubleSide}));panel.position.z=.028;g.add(panel);
+ let core=new THREE.Mesh(new THREE.ShapeGeometry(hutArch(w*.82,h*.90)),new THREE.MeshBasicMaterial({color:0xffa06b,side:THREE.DoubleSide}));core.position.set(0,.06,.037);g.add(core);
+ box(cabinTrim,0,h*.44,.065,.052,h*.88,.06,g);for(let k=1;k<4;k++)box(cabinTrim,0,k*h*.18,.065,w*.96,.048,.055,g);
+ for(let k=0;k<3;k++)for(let sign of [-1,1])rod(cabinTrim,v(-w*.45,k*h*.19+.04,.078),v(w*.45,k*h*.19+.04+h*.18*sign+(sign<0?h*.18:0),.078),.023,g);
+ box(cabinTrim,0,-.075,.09,w+.27,.11,.22,g);return g}
+function hutRoofPoint(side,t,z){let bend=.25*Math.sin((z+2.9)*.65),ridgeX=.62+bend,ridgeY=7.0+.36*Math.sin(z*.82);let edgeX=side*(3.30+.10*Math.sin(z*1.5)),edgeY=2.73+.14*Math.sin(z*1.4+side);return [edgeX+(ridgeX-edgeX)*t,edgeY+(ridgeY-edgeY)*Math.pow(t,.88),z]}
+function buildGothicRoof(){for(let q of [-1,1]){for(let row=0;row<8;row++)for(let col=0;col<11;col++){let t0=row/8,t1=Math.min(1,(row+1)/8+.015),z0=-3.0+col*6/11,z1=z0+6/11+.045;let pts=[hutRoofPoint(q,t0,z0),hutRoofPoint(q,t1,z0),hutRoofPoint(q,t1,z1),hutRoofPoint(q,t0,z1)];let lift=hutRange(.015,.065);pts.forEach(a=>a[1]+=lift);hutFace(pts,hutShingleMats[(row+col+Math.floor(hutRand()*3))%5],cabinExterior)}
+ for(let z of [-3.02,3.02]){let pts=[];for(let i=0;i<=10;i++)pts.push(hutRoofPoint(q,i/10,z));tube(pts,.09,cabinTrim,cabinExterior,20)}}
+ const gableMat=new THREE.MeshStandardMaterial({color:0x53404a,map:hutGrain,roughness:1,side:THREE.DoubleSide});
+ for(let z of [-2.5,2.5]){let left=hutRoofPoint(-1,0,z),right=hutRoofPoint(1,0,z),peak=hutRoofPoint(1,1,z);hutFace([left,right,peak],gableMat,cabinExterior);for(let i=-4;i<=4;i++){let x=i*.51,h=peak[1]-Math.abs(x-peak[0])*1.15;rod(cabinTrim,v(x,2.92,z+Math.sign(z)*.04),v(x,Math.max(3.1,h-.35),z+Math.sign(z)*.04),.035,cabinExterior)}}
+ let ridge=[];for(let i=0;i<=12;i++)ridge.push(hutRoofPoint(1,1,-3.15+i*6.3/12));tube(ridge,.12,cabinTrim,cabinExterior,24);
+ let chimney=new THREE.Group();chimney.position.set(-1.58,4.22,-1.2);chimney.rotation.z=-.13;cabinExterior.add(chimney);box(cabinStone,0,1.2,0,.65,2.4,.64,chimney);box(cabinTrim,0,2.43,0,.86,.24,.83,chimney);
+ for(let k=0;k<7;k++)box(cabinTrim,0,k*.34+.19,.329,.62,.025,.028,chimney,false);
+ hutWindow(cabinExterior,.46,3.32,2.59,1.02,2.08);
+ hutWindow(cabinExterior,1.78,.70,2.69,.68,1.47);
+ for(let q of [-1,1]){let x=q*2.6;for(let i=0;i<10;i++){let yy=i*.28+.14;box(cabinTrim,x,yy,2.69,.07,.27,.07,cabinExterior,false)}rod(cabinTrim,v(q*.84,2.7,2.72),v(q*2.65,.21,2.72),.085,cabinExterior)}
+ // Twisted root-like timber framing wraps the facade without blocking the entrance.
+ tube([[-2.75,.05,2.65],[-2.55,1.0,2.78],[-2.63,2.1,2.77],[-1.85,2.9,2.82],[-.8,3.15,2.77],[.18,3.0,2.79]],.15,cabinTrim,cabinExterior,28);
+ tube([[2.75,.08,2.65],[2.62,1.22,2.82],[2.12,2.4,2.83],[1.6,3.0,2.84],[1.55,4.2,2.71]],.13,cabinTrim,cabinExterior,24);
+ const porchGlow=glow(0xff562d,2.1);box(cabinMetal,-.91,2.34,2.81,.22,.31,.21,cabinExterior);ball(porchGlow,-.91,2.34,2.96,.10,.13,.09,cabinExterior,false);
+ const porchLight=new THREE.PointLight(0xff643a,8,12,2);porchLight.position.set(.4,2.55,3.12);cabinExterior.add(porchLight);
+ for(let j=0;j<12;j++){let a=j*2.39996,x=Math.cos(a)*3.1,z=Math.sin(a)*2.65;if(z>1.9&&Math.abs(x)<1.9)continue;ball(cabinStone,x,.05,z,hutRange(.29,.58),hutRange(.18,.38),hutRange(.3,.65),cabinExterior)}
+}
+function cabinShell(parent,interior=false){let wood=interior?cabinWood:cabinWood;
  box(cabinStone,0,-.10,0,5.8,.2,5.3,parent);
  box(wood,-2.75,1.5,0,.3,3,5,parent);box(wood,2.75,1.5,0,.3,3,5,parent);
  box(wood,0,1.5,-2.5,5.5,3,.3,parent);
@@ -188,15 +221,19 @@ function cabinShell(parent,interior=false){let wood=interior?mat(0x594437):cabin
 }
 function cabinDoor(parent){let pivot=new THREE.Group();pivot.position.set(-.70,0,2.5);parent.add(pivot);box(cabinDoorMat,.70,1.19,0,1.4,2.38,.15,pivot);for(let i=1;i<6;i++)box(cabinWood,i*.23,1.19,-.085,.028,2.30,.025,pivot,false);for(let y of [.32,1.95])box(cabinTrim,.70,y,-.115,1.34,.11,.06,pivot);ball(cabinMetal,1.19,1.17,-.14,.065,.065,.065,pivot,false);ball(cabinMetal,1.19,1.17,.14,.065,.065,.065,pivot,false);return pivot}
 cabinShell(cabinExterior);cabinDoor(cabinExterior);
-for(let q of [-1,1]){let roof=box(cabinTrim,q*1.43,3.45,0,3.25,.22,5.8,cabinExterior);roof.rotation.z=-q*.27}
-const cabinInterior=new THREE.Scene();cabinInterior.background=new THREE.Color(0x080605);
+buildGothicRoof();
+const cabinInterior=new THREE.Scene();cabinInterior.background=new THREE.Color(0x100a0e);
 cabinShell(cabinInterior,true);const innerDoor=cabinDoor(cabinInterior);
 box(0x080605,0,1.5,2.95,1.6,3,.10,cabinInterior); // opaque darkness behind the doorway
+for(let z of [-1.65,0,1.65])box(cabinTrim,0,2.87,z,5.2,.22,.19,cabinInterior);
+for(let q of [-1,1]){box(cabinTrim,q*2.51,1.48,0,.12,2.9,.17,cabinInterior);box(cabinTrim,q*2.51,.26,0,.12,.21,4.55,cabinInterior)}
+let hearth=new THREE.Group();hearth.position.set(0,0,-2.25);cabinInterior.add(hearth);box(cabinStone,0,.42,0,1.1,.84,.37,hearth);box(cabinTrim,0,.37,.205,.65,.48,.06,hearth);box(cabinStone,0,.91,.08,1.26,.13,.53,hearth);for(let i=0;i<4;i++)ball(glow(0xc54d27,1.2),-.23+i*.15,.24,.255,.10,.09,.045,hearth,false);
+box(cabinWood,1.78,1.55,-2.19,.92,.09,.26,cabinInterior);for(let i=0;i<3;i++)box([0x57424c,0x6c4b3b,0x6b6060][i],1.52+i*.19,1.73,-2.16,.13,.29,.17,cabinInterior);
 for(let i=0;i<9;i++)box(0x49352c,0,.011,-2.13+i*.52,5.16,.035,.49,cabinInterior,false);
 box(0x392a24,-1.55,.22,-1.52,1.62,.44,1.12,cabinInterior);box(0x665e53,-1.55,.52,-1.52,1.58,.18,1.08,cabinInterior);box(0xa59a84,-1.55,.66,-1.87,.66,.15,.36,cabinInterior);
 box(cabinWood,1.73,.60,-1.48,.88,.13,.77,cabinInterior);for(let q of [-1,1])for(let k of [-1,1])box(cabinTrim,1.73+q*.33,.29,-1.48+k*.29,.10,.58,.10,cabinInterior);
 box(cabinMetal,1.73,.74,-1.48,.23,.13,.23,cabinInterior);ball(glow(0xffac56,1.6),1.73,.95,-1.48,.09,.15,.09,cabinInterior,false);
-const cabinLamp=new THREE.PointLight(0xffb46c,14,10,2);cabinLamp.position.set(1.73,1.17,-1.48);cabinInterior.add(cabinLamp,new THREE.HemisphereLight(0xa29a91,0x39302c,1.05));
+const cabinLamp=new THREE.PointLight(0xff9860,14,10,2);cabinLamp.position.set(1.73,1.17,-1.48);cabinInterior.add(cabinLamp,new THREE.HemisphereLight(0xa29a91,0x39302c,1.05));
 function cabinBlocked(x,z,r=.42){return Math.abs(x-cabin.x)<2.91+r&&Math.abs(z-cabin.z)<2.66+r}
 function cabinEntrance(p){return Math.abs(p.x-cabin.x)<1.65&&p.z>cabin.z+2.55&&p.z<cabin.z+5.4}
 function enterCabin(){state.house=true;state.hidden=null;state.houseExit=0;state.attack=0;p.jumpY=p.jumpV=0;p.x=cabin.x;p.z=cabin.z-.85;p.y=0;p.yaw=0;p.pitch=0;state.third=false;cameraInitialized=false;innerDoor.rotation.y=0;keys.clear();stick.x=stick.y=0;touchSprint=mouseDown=touchAttack=false;toast('SAFE HOUSE · Open the door to leave.',4)}
