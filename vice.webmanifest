@@ -1,0 +1,20 @@
+{
+  "id": "./vice-vibes.html",
+  "name": "Grand Theft Wilco: Vice Chaos",
+  "short_name": "Wilco Vice",
+  "description": "Flamingo Bay — open-world arcade action",
+  "start_url": "./vice-vibes.html?app=1",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#13162b",
+  "theme_color": "#13162b",
+  "icons": [
+    {
+      "src": "./vice-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
