@@ -33,16 +33,10 @@ function makeSurface(kind){let c=document.createElement('canvas');const res=mobi
 const surfaces={asphalt:makeSurface('asphalt'),grass:makeSurface('grass'),sand:makeSurface('sand'),concrete:makeSurface('concrete')};
 const asphaltMats=new Set(),glassMats=new Set(),facadeMats=new Map();
 const wetSurface={value:0};
-function worldMapped(m,tex,repeat,road=false){m.map=tex;m.onBeforeCompile=sh=>{sh.uniforms.terrainRepeat={value:repeat};sh.uniforms.terrainWet=road?wetSurface:{value:0};sh.vertexShader='varying vec3 surfaceWorld;\n'+sh.vertexShader.replace('#include <project_vertex>','vec4 surfaceP=vec4(transformed,1.0);\n#ifdef USE_INSTANCING\nsurfaceP=instanceMatrix*surfaceP;\n#endif\nsurfaceWorld=(modelMatrix*surfaceP).xyz;\n#include <project_vertex>');sh.fragmentShader='varying vec3 surfaceWorld; uniform float terrainRepeat; uniform float terrainWet;\n'+sh.fragmentShader.replace('#include <map_fragment>',`vec4 surfaceSample=texture2D(map,surfaceWorld.xz*terrainRepeat);
-float wetPatch=smoothstep(.18,.78,sin(surfaceWorld.x*.29+sin(surfaceWorld.z*.23))*sin(surfaceWorld.z*.37)*.5+.5)*terrainWet;
-diffuseColor*=surfaceSample;diffuseColor.rgb*=1.-wetPatch*.36;`).replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
-roughnessFactor=clamp(roughnessFactor*(.78+surfaceSample.r*.25)-wetPatch*.32,.09,1.);`).replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
-float relief=surfaceSample.r*.018*(1.-wetPatch*.8);
-vec3 pDx=dFdx(-vViewPosition),pDy=dFdy(-vViewPosition);
-vec3 rx=cross(pDy,normal),ry=cross(normal,pDx);
-float det=dot(pDx,rx);
-vec3 bumpGradient=sign(det)*(dFdx(relief)*rx+dFdy(relief)*ry);
-normal=normalize(max(abs(det),.00001)*normal-bumpGradient);`);};m.customProgramCacheKey=()=> 'worldSurface-v4-'+repeat+'-'+road;return m}
+// Use stock Three.js opaque materials instead of derivative-based shader injection.
+function worldMapped(m,tex,repeat,road=false){m.map=tex;m.transparent=false;m.opacity=1;m.depthWrite=true;m.depthTest=true;m.side=THREE.DoubleSide;m.userData.tileScale=repeat;return m}
+const tiledBoxes=new Map();
+function tiledBoxGeometry(w,h,d,repeat){let key=[w,h,d,repeat].join(':');if(tiledBoxes.has(key))return tiledBoxes.get(key);let g=unit.clone(),uv=g.attributes.uv;for(let face=0;face<6;face++){let u=face<2?d:w,v=face<2?h:face<4?d:h;for(let i=face*4;i<face*4+4;i++)uv.setXY(i,uv.getX(i)*Math.max(.2,u*repeat),uv.getY(i)*Math.max(.2,v*repeat))}uv.needsUpdate=true;tiledBoxes.set(key,g);return g}
 function mat(c){if(!materials.has(c)){let m=new THREE.MeshStandardMaterial({color:c,roughness:.83});let kind=null;if([0x444b55,0x414b58,0x3c444b,0x454957].includes(c)){kind='asphalt';m.color.setHex(0x4e5357);m.roughness=.92;asphaltMats.add(m)}else if([0x93aa8c,0x86a36a,0x708a4d,0x6e9d63].includes(c)){kind='grass';m.color.multiplyScalar(.79)}else if([0xe6c99d,0xf1d1aa].includes(c))kind='sand';else if([0xb9b9b4,0xb9b8b0,0x91999a,0x7a8588].includes(c))kind='concrete';if(kind)worldMapped(m,surfaces[kind],kind==='asphalt'?.36:kind==='concrete'?.5:.4,kind==='asphalt');
  if([0x3a657c,0x57747c,0x2d314e,0x50697e,0x557f96,0x638ea1].includes(c)){m.roughness=.13;m.metalness=.48;m.envMapIntensity=1.35;glassMats.add(m)}
  materials.set(c,m)}return materials.get(c)}
@@ -52,7 +46,7 @@ const envCanvas=document.createElement('canvas');envCanvas.width=1024;envCanvas.
 
 const unit=new THREE.BoxGeometry(1,1,1), sphere=new THREE.SphereGeometry(1,20,14), cylinder=new THREE.CylinderGeometry(1,1,1,18), cone=new THREE.ConeGeometry(1,1,9);
 function mesh(geo,c,x,y,z,sx,sy,sz,parent=scene){const o=new THREE.Mesh(geo,mat(c));o.position.set(x,y,z);o.scale.set(sx,sy,sz);parent.add(o);return o}
-function box(x,y,z,w,h,d,c,p){return mesh(unit,c,x,y,z,w,h,d,p)}
+function box(x,y,z,w,h,d,c,p){let m=mat(c);return mesh(m.userData.tileScale?tiledBoxGeometry(w,h,d,m.userData.tileScale):unit,c,x,y,z,w,h,d,p)}
 function ball(x,y,z,sx,sy,sz,c,p){return mesh(sphere,c,x,y,z,sx,sy,sz,p)}
 const rounded=new RoundedBoxGeometry(1,1,1,3,.13),capsule=new THREE.CapsuleGeometry(.5,1,5,12);function round(x,y,z,w,h,d,c,p){return mesh(rounded,c,x,y,z,w,h,d,p)}function limb(x,y,z,w,h,d,c,p){return mesh(capsule,c,x,y,z,w,h/2,d,p)}
 const blocks=[],roadX=[-352,-288,-224,-160,-96,-32,32,96,160],roadZ=[-352,-288,-224,-160,-96,-32,32,96,160,224,288,352],road=roadX,world={minX:-382,maxX:246,minZ:-382,maxZ:382,shore:194},limit=382;
@@ -184,6 +178,9 @@ for(let z=-170;z<220;z+=18){for(let q of [-1,1]){let x=201+q*2.6;B(x,.11,z,3.1,.
 for(let z=-175;z<220;z+=9){B(187.3,.57,z,.13,1.12,.13,0x727d80,true,true);if(z<211){B(187.3,1.05,z+4.5,.09,.075,9,0xc0c4bf,true);B(187.3,.53,z+4.5,.07,.065,9,0x9da6a4,true)}}
 for(let x of roadX)for(let z of roadZ){if(x<-192&&z<-192)continue;for(let q of [-1,1]){B(x+q*9.9,.14,z+15,.16,.08,7,0xd6d1c4,true);B(x+q*9.9,.14,z-15,.16,.08,7,0xd6d1c4,true)}if((x+z)%128===0){let xx=x-11,zz=z+11;B(xx,.55,zz,.18,1.10,.18,0xa6aaa6,true,true);B(xx,1.15,zz,.44,.12,.32,0xa6aaa6,true);B(xx,1.37,zz,.40,.35,.11,0x314b57,true);lit(xx,1.39,zz+.068,.23,.20,.014,blueNeon,true)}}
 Math.random=cityOriginalRandom;batchScenery();
+// Independent opaque bedrock: never culled or dependent on procedural shaders.
+const solidGround=new THREE.Mesh(new THREE.BoxGeometry(588,1,780),new THREE.MeshStandardMaterial({color:0x77896c,roughness:1,side:THREE.DoubleSide,transparent:false,depthWrite:true}));solidGround.position.set(-94,-.78,0);solidGround.frustumCulled=false;solidGround.receiveShadow=true;scene.add(solidGround);
+const solidBeach=new THREE.Mesh(new THREE.BoxGeometry(64,1,780),new THREE.MeshStandardMaterial({color:0xd4bc91,roughness:1,side:THREE.DoubleSide,transparent:false,depthWrite:true}));solidBeach.position.set(220,-.83,0);solidBeach.frustumCulled=false;solidBeach.receiveShadow=true;scene.add(solidBeach);
 const water=new Reflector(new THREE.PlaneGeometry(520,1000),{textureWidth:mobileVice?256:1024,textureHeight:mobileVice?256:1024,color:0x6a9fae,clipBias:.004});water.rotation.x=-Math.PI/2;water.position.set(507,-.24,0);scene.add(water);let reflectTick=0;const reflectRender=water.onBeforeRender;water.onBeforeRender=function(...args){if(reflectTick++%(quality===0?8:4)===0)reflectRender.apply(this,args)};
 // Transparent moving wave layer over the planar reflection, with shoreline foam and sun glints.
 const waves=new THREE.Mesh(new THREE.PlaneGeometry(520,1000),new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{time:{value:0},light:{value:1},storm:{value:0},sunDir:{value:new THREE.Vector3(0,1,0)}},vertexShader:`varying vec2 vUv;varying vec3 worldP;void main(){vUv=uv;worldP=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,fragmentShader:`varying vec2 vUv;varying vec3 worldP;uniform float time,light,storm;uniform vec3 sunDir;
