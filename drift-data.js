@@ -51,11 +51,11 @@ export function drive(s,c,b,input,dt,mu,assist){
  s.r=damp(s.r||0,clamp(yawTarget,-1.65,1.65),5+help*3);
  let nextYaw=s.yaw+s.r*dt;
  let speed=vel+acceleration*dt*Math.sign(u||1);
- if(reverse){speed=vel+Math.abs(acceleration)*dt; if(vel<.2)speed=Math.abs(acceleration)*dt}
+ if(reverse){speed=clamp(vel-acceleration*dt,0,9)}
  if(!reverse&&brake&&u>=0)speed=Math.max(0,speed);
  if(!reverse&&u<0&&gas>0)speed=Math.max(0,vel-acceleration*dt);
  speed=clamp(speed,0,capspeed*1.06);
- let backwards=reverse||(u<-.1&&!(gas>0&&speed<.2)),velYaw=vel>.08?Math.atan2(s.vx,s.vz):s.yaw+(backwards?Math.PI:0);
+ let backwards=reverse||(u<-.1&&!(gas>0&&speed<.2)),velYaw=vel>.08?Math.atan2(s.vx,s.vz):s.yaw+(backwards?Math.PI:0);if(reverse&&vel<.55)velYaw=nextYaw+Math.PI;
  let desired=nextYaw+(backwards?Math.PI:0),error=wrap(desired-velYaw);
  let gripRate=(1.4+grip*3.1)*(1-s.slide*.82)+help*.85;
  if(vel<5||backwards)gripRate=10;
