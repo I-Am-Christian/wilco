@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {themes,maps,cars,difficulties,defaults,fresh,clamp,seeded,unlocked,award,drive,driftRate} from './drift-data.js?v=4';
+import {themes,maps,cars,difficulties,defaults,fresh,clamp,seeded,unlocked,award,drive,driftRate} from './drift-data.js?v=6';
 import {worldContact,carContact,resolveContact,damageAmount} from './drift-collision.js?v=1';
 import {RoundedBoxGeometry} from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/geometries/RoundedBoxGeometry.js';
 const $=id=>document.getElementById(id),mobile=matchMedia('(pointer:coarse),(max-width:700px)').matches,TAU=Math.PI*2,angle=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b)),fmt=n=>Math.floor(n).toLocaleString(),KEY='wilco-drift-dynasty-v1';
