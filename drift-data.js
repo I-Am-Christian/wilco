@@ -24,20 +24,48 @@ export function seeded(n){return()=>{n=(Math.imul(n,1664525)+1013904223)>>>0;ret
 export function unlocked(s,m){return m===0||s.cleared.includes(m-1)&&(m%10!==0||s.bosses.includes(Math.floor(m/10)-1))}
 export function award(s,m,boss,won,score,combo,difficulty,practice=false){s.best=Math.max(s.best,Math.floor(score));s.combo=Math.max(s.combo,Math.floor(combo));let specials=cars.filter(c=>c.type==="stunt"&&Math.max(score,combo)>=c.unlock&&!s.owned.includes(c.id));for(let c of specials)s.owned.push(c.id);let pay=practice?0:Math.round((won?600+m*35+(boss?2400+Math.floor(m/10)*650:0):100+m*4)*(1+difficulty*.2));s.cash+=pay;s.earnings+=pay;if(!practice&&won){if(boss){let n=Math.floor(m/10);if(!s.bosses.includes(n)){s.bosses.push(n);s.owned.push(120+n);s.parts=Math.max(s.parts,n+1)}}else if(!s.cleared.includes(m))s.cleared.push(m)}let key=m+":"+Number(boss)+":"+difficulty;if(!practice)s.records[key]=Math.max(s.records[key]||0,Math.floor(score));return {pay,specials:specials.map(c=>c.name)}}
 // Dynamic single-track handling with independent front/rear slip, friction limits, and low-speed blend.
+// Steering input is screen-relative: positive means right. Cars face local +Z,
+// so a right turn is a negative world yaw. Velocity retains its own heading.
 export function drive(s,c,b,input,dt,mu,assist){
-let sy=Math.sin(s.yaw),cy=Math.cos(s.yaw),u=s.vx*sy+s.vz*cy,v=s.vx*cy-s.vz*sy,vel=Math.abs(u),L=c.wb,lf=L*.49,lr=L*.51,m=c.mass,g=9.81;
-let target=input.steer*.56*(b.steer/100)/(1+vel*.022),damp=(a,b,k)=>a+(b-a)*(1-Math.exp(-k*dt));s.steer=damp(s.steer,target,7.5);
-let fz=m*g*.5,grip=c.grip*mu*b.grip/100,hand=input.hand,throttle=input.gas,brake=input.brake;let rear=grip*fz*(hand?.35:1),front=grip*fz;
-let power=(c.hp+65*b.engine)*745.7,traction=hand?.72:.72,fx=Math.min(power/Math.max(6,vel),rear*traction)*throttle;
-if(brake&&u<.4&&!throttle){fx=u> -8?-m*2.8:0}else if(brake)fx-=Math.sign(u)*Math.min(m*g*grip*.85*b.brake/100,vel*m/dt)*brake;
-if(hand)fx-=Math.sign(u)*rear*.35;
-let alphaF=s.steer-Math.atan2(v+lf*s.r,Math.max(2,vel)),alphaR=-Math.atan2(v-lr*s.r,Math.max(2,vel));
-let fyF=clamp(fz*7*alphaF,-front,front),lim=Math.sqrt(Math.max(0,rear*rear-Math.min(rear,Math.abs(fx))**2)),fyR=clamp(fz*6.2*alphaR,-lim,lim);
-let ax=(fx-fyF*Math.sin(s.steer))/m-Math.sign(u)*(.13+.0007*u*u),ay=(fyF*Math.cos(s.steer)+fyR)/m;
-let yawRate=clamp(s.r+(lf*fyF*Math.cos(s.steer)-lr*fyR)/(m*(L*.48)**2)*dt,-2.3,2.3),low=clamp((8-vel)/5,0,1);if(u<0)low=1;
-yawRate=yawRate*(1-low)+(u/L*Math.tan(s.steer))*low;
-let slip=Math.atan2(v,Math.max(2,vel)),help=assist*b.assist/100;if(!hand&&Math.abs(slip)>.22){yawRate=damp(yawRate,slip*.9,help*3.4);ay-=v*help*.8}
-if(!hand&&Math.abs(input.steer)<.06){yawRate=damp(yawRate,0,2+help*5);ay-=v*(.5+help*2)}s.yaw+=yawRate*dt;s.r=yawRate;let vx=s.vx+(ax*sy+ay*cy)*dt,vz=s.vz+(ax*cy-ay*sy)*dt,ns=Math.sin(s.yaw),nc=Math.cos(s.yaw),nu=vx*ns+vz*nc,nv=vx*nc-vz*ns;
-if(low>0)nv=damp(nv,nu*lr/L*Math.tan(s.steer),low*12);if(!hand&&Math.abs(input.steer)<.06){s.r=damp(s.r,0,2+help*6);nv=damp(nv,0,1+help*4)}if(!throttle&&!brake&&Math.hypot(nu,nv)<.12)nu=nv=0;
-s.vx=nu*ns+nv*nc;s.vz=nu*nc-nv*ns;s.x+=s.vx*dt;s.z+=s.vz*dt;s.speed=nu;s.slip=Math.atan2(Math.abs(nv),Math.max(.5,Math.abs(nu)));return s}
+ const damp=(a,b,k)=>a+(b-a)*(1-Math.exp(-k*dt)),wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
+ let sy=Math.sin(s.yaw),cy=Math.cos(s.yaw),u=s.vx*sy+s.vz*cy,v=s.vx*cy-s.vz*sy,vel=Math.hypot(s.vx,s.vz),g=9.81,L=c.wb;
+ let grip=clamp(c.grip*mu*b.grip/100,.25,1.6),help=clamp(assist*b.assist/100,0,1.5),gas=clamp(input.gas,0,1),brake=clamp(input.brake,0,1),hand=!!input.hand;
+ let steerTarget=-clamp(input.steer,-1,1)*Math.min(.60,Math.atan(L*grip*g*1.9/Math.max(5,vel*vel))+.12)*b.steer/100;
+ s.steer=damp(s.steer,steerTarget,9);
+ let reverseIntent=brake>.05&&gas<.05&&(u<-.05||vel<.55);s.reverseHold=reverseIntent?(s.reverseHold||0)+dt:0;let reverse=reverseIntent&&(u<-.05||s.reverseHold>.24);
+ let power=(c.hp+65*b.engine)*745.7,capspeed=55+power/c.mass*.075;
+ let acceleration=gas*Math.min(power/c.mass/Math.max(5,vel),grip*g*.58)*(hand?.55:1);
+ if(vel>capspeed)acceleration*=.04;
+ if(reverse)acceleration=u> -9?-2.9*brake:0;
+ else if(brake)acceleration-=Math.min(vel/dt,grip*g*.93*b.brake/100)*brake*Math.sign(u||1);
+ if(hand&&vel>1)acceleration-=Math.sign(u)*grip*1.5;
+ acceleration-=Math.sign(u)*Math.min(Math.abs(u)/dt,.12+.00065*vel*vel+(mu<.6?.45:0));
+ // Rear grip breaks progressively with the handbrake or power at substantial slip.
+ let oldSlip=Math.atan2(v,Math.max(.5,Math.abs(u))),powerSlide=gas>.4&&vel>8&&Math.abs(s.steer)>.12;
+ let slideTarget=hand&&vel>5?1:powerSlide?clamp((Math.abs(s.steer)*vel-1.7)*.42,0,.58):Math.abs(oldSlip)>.18&&gas>.3?.45:0;
+ s.slide=damp(s.slide||0,slideTarget,slideTarget>(s.slide||0)?5:2.5);
+ let ideal=u/L*Math.tan(s.steer),turnLimit=grip*g/Math.max(3,vel),yawTarget=clamp(ideal,-turnLimit*(1+s.slide*1.65),turnLimit*(1+s.slide*1.65));
+ // Stability assistance opposes excess rotation, not deliberate steering.
+ if(Math.abs(input.steer)<.05&&!hand)yawTarget=0;
+ if(Math.abs(oldSlip)>.72&&!hand)yawTarget+=oldSlip*help*.55;
+ s.r=damp(s.r||0,clamp(yawTarget,-1.65,1.65),5+help*3);
+ let nextYaw=s.yaw+s.r*dt;
+ let speed=vel+acceleration*dt*Math.sign(u||1);
+ if(reverse){speed=vel+Math.abs(acceleration)*dt; if(vel<.2)speed=Math.abs(acceleration)*dt}
+ if(!reverse&&brake&&u>=0)speed=Math.max(0,speed);
+ if(!reverse&&u<0&&gas>0)speed=Math.max(0,vel-acceleration*dt);
+ speed=clamp(speed,0,capspeed*1.06);
+ let backwards=reverse||(u<-.1&&!(gas>0&&speed<.2)),velYaw=vel>.08?Math.atan2(s.vx,s.vz):s.yaw+(backwards?Math.PI:0);
+ let desired=nextYaw+(backwards?Math.PI:0),error=wrap(desired-velYaw);
+ let gripRate=(1.4+grip*3.1)*(1-s.slide*.82)+help*.85;
+ if(vel<5||backwards)gripRate=10;
+ let maxChange=grip*g/Math.max(2,vel)*(1-s.slide*.35);
+ let headingStep=clamp(error*(1-Math.exp(-gripRate*dt)),-maxChange*dt,maxChange*dt);
+ if(vel<2)headingStep=error*(1-Math.exp(-12*dt));
+ velYaw+=headingStep;
+ if(speed<.10&&!gas&&!reverse)speed=0;
+ s.yaw=nextYaw;s.vx=Math.sin(velYaw)*speed;s.vz=Math.cos(velYaw)*speed;
+ s.x+=s.vx*dt;s.z+=s.vz*dt;let ns=Math.sin(nextYaw),nc=Math.cos(nextYaw);
+ s.speed=s.vx*ns+s.vz*nc;s.slip=Math.atan2(Math.abs(s.vx*nc-s.vz*ns),Math.max(.5,Math.abs(s.speed)));s.ax=damp(s.ax||0,acceleration,8);return s
+}
 export function driftRate(speed,angle,chain,onRoad){return onRoad&&speed>7&&angle>.14&&angle<1.20?Math.min(75,speed)*Math.sin(angle)*Math.min(4,1+chain/5)*7:0}
