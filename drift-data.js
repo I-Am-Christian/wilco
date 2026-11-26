@@ -30,7 +30,7 @@ export function drive(s,c,b,input,dt,mu,assist){
  const damp=(a,b,k)=>a+(b-a)*(1-Math.exp(-k*dt)),wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
  let sy=Math.sin(s.yaw),cy=Math.cos(s.yaw),u=s.vx*sy+s.vz*cy,v=s.vx*cy-s.vz*sy,vel=Math.hypot(s.vx,s.vz),g=9.81,L=c.wb;
  let grip=clamp(c.grip*mu*b.grip/100,.25,1.6),help=clamp(assist*b.assist/100,0,1.5),gas=clamp(input.gas,0,1),brake=clamp(input.brake,0,1),hand=!!input.hand;
- let steerTarget=-clamp(input.steer,-1,1)*Math.min(.60,Math.atan(L*grip*g*1.9/Math.max(5,vel*vel))+.12)*b.steer/100;
+ let steerTarget=-clamp(input.steer,-1,1)*Math.min(.60,Math.atan(L*grip*g*1.15/Math.max(5,vel*vel))+.075)*b.steer/100;
  s.steer=damp(s.steer,steerTarget,9);
  let reverseIntent=brake>.05&&gas<.05&&(u<-.05||vel<.55);s.reverseHold=reverseIntent?(s.reverseHold||0)+dt:0;let reverse=reverseIntent&&(u<-.05||s.reverseHold>.24);
  let power=(c.hp+65*b.engine)*745.7,capspeed=55+power/c.mass*.075;
@@ -41,13 +41,14 @@ export function drive(s,c,b,input,dt,mu,assist){
  if(hand&&vel>1)acceleration-=Math.sign(u)*grip*1.5;
  acceleration-=Math.sign(u)*Math.min(Math.abs(u)/dt,.12+.00065*vel*vel+(mu<.6?.45:0));
  // Rear grip breaks progressively with the handbrake or power at substantial slip.
- let oldSlip=Math.atan2(v,Math.max(.5,Math.abs(u))),powerSlide=gas>.4&&vel>8&&Math.abs(s.steer)>.12;
- let slideTarget=hand&&vel>5?1:powerSlide?clamp((Math.abs(s.steer)*vel-1.7)*.42,0,.58):Math.abs(oldSlip)>.18&&gas>.3?.45:0;
- s.slide=damp(s.slide||0,slideTarget,slideTarget>(s.slide||0)?5:2.5);
- let ideal=u/L*Math.tan(s.steer),turnLimit=grip*g/Math.max(3,vel),yawTarget=clamp(ideal,-turnLimit*(1+s.slide*1.65),turnLimit*(1+s.slide*1.65));
+ let oldSlip=Math.atan2(v,Math.max(.5,Math.abs(u))),powerSlide=gas>.92&&vel>12&&Math.abs(input.steer)>.90&&Math.abs(s.steer)>.12;
+ // Normal cornering does not initiate a sustained drift. Handbrake is the primary trigger.
+ let slideTarget=hand&&vel>5?.87:powerSlide?.14:0;
+ s.slide=damp(s.slide||0,slideTarget,slideTarget>(s.slide||0)?6:7.8+help*4);
+ let ideal=u/L*Math.tan(s.steer),turnLimit=grip*g/Math.max(3,vel),yawTarget=clamp(ideal,-turnLimit*(.84+s.slide*1.55),turnLimit*(.84+s.slide*1.55));
  // Stability assistance opposes excess rotation, not deliberate steering.
  if(Math.abs(input.steer)<.05&&!hand)yawTarget=0;
- if(Math.abs(oldSlip)>.72&&!hand)yawTarget+=oldSlip*help*.55;
+ if(!hand&&Math.abs(oldSlip)>.14)yawTarget+=clamp(oldSlip*(1.2+help*2.0),-.75,.75);
  s.r=damp(s.r||0,clamp(yawTarget,-1.65,1.65),5+help*3);
  let nextYaw=s.yaw+s.r*dt;
  let speed=vel+acceleration*dt*Math.sign(u||1);
@@ -57,9 +58,9 @@ export function drive(s,c,b,input,dt,mu,assist){
  speed=clamp(speed,0,capspeed*1.06);
  let backwards=reverse||(u<-.1&&!(gas>0&&speed<.2)),velYaw=vel>.08?Math.atan2(s.vx,s.vz):s.yaw+(backwards?Math.PI:0);if(reverse&&vel<.55)velYaw=nextYaw+Math.PI;
  let desired=nextYaw+(backwards?Math.PI:0),error=wrap(desired-velYaw);
- let gripRate=(1.4+grip*3.1)*(1-s.slide*.82)+help*.85;
+ let gripRate=(8.5+grip*5.5)*(1-s.slide*.88)+help*2.5;
  if(vel<5||backwards)gripRate=10;
- let maxChange=grip*g/Math.max(2,vel)*(1-s.slide*.35);
+ let maxChange=grip*g/Math.max(2,vel)*(1.12-s.slide*.62);
  let headingStep=clamp(error*(1-Math.exp(-gripRate*dt)),-maxChange*dt,maxChange*dt);
  if(vel<2)headingStep=error*(1-Math.exp(-12*dt));
  velYaw+=headingStep;
