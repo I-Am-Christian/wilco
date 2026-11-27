@@ -3,4 +3,7 @@ export function boxContact(x,z,r,b){let c=Math.cos(b.a),s=Math.sin(b.a),dx=x-b.x
 export function carContact(a,b,ra=1.12,rb=1.12){let best=null;for(let i of [-1,0,1])for(let j of [-1,0,1]){let x=a.x+Math.sin(a.yaw)*i*1.12-(b.x+Math.sin(b.yaw)*j*1.12),z=a.z+Math.cos(a.yaw)*i*1.12-(b.z+Math.cos(b.yaw)*j*1.12),d=Math.hypot(x,z),depth=ra+rb-d;if(depth>0&&(!best||depth>best.depth))best={nx:d>1e-6?x/d:Math.cos(a.yaw),nz:d>1e-6?z/d:-Math.sin(a.yaw),depth}}return best}
 export function resolveContact(p,h,otherVx=0,otherVz=0){p.x+=h.nx*(h.depth+.025);p.z+=h.nz*(h.depth+.025);let v=(p.vx-otherVx)*h.nx+(p.vz-otherVz)*h.nz;if(v>=0)return 0;let impact=-v;p.vx-=v*h.nx*1.16;p.vz-=v*h.nz*1.16;p.vx*=.91;p.vz*=.91;p.r*=.65;p.speed=p.vx*Math.sin(p.yaw)+p.vz*Math.cos(p.yaw);return impact}
 export function worldContact(p,boxes,r=1.05){let hit=null;for(let b of boxes){if(Math.abs(p.x-b.x)>b.bound+3||Math.abs(p.z-b.z)>b.bound+3)continue;for(let j of [-1,0,1]){let h=boxContact(p.x+Math.sin(p.yaw)*j*1.18,p.z+Math.cos(p.yaw)*j*1.18,r,b);if(h&&(!hit||h.depth>hit.depth))hit=h}}return hit}
-export const damageAmount=impact=>Math.max(0,Math.min(38,(impact-2.5)*1.65));
+// Damage is percentage of integrity; only substantial impact velocity causes damage.
+export const damageAmount=impact=>Number.isFinite(impact)?Math.max(0,Math.min(10,(impact-5.5)*.42)):0;
+export function collisionDamage(impact,cooldown,vehicle=false){return cooldown>0?0:damageAmount(impact)*(vehicle?.70:1)}
+
