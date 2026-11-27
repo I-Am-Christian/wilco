@@ -5,6 +5,7 @@ on:
       - 'drift*'
       - 'drift-assets/**'
       - 'tests/drift-browser.spec.mjs'
+      - 'tools/validate-drift-assets.mjs'
       - '.github/workflows/drift-qa.yml'
   workflow_dispatch:
 jobs:
@@ -21,8 +22,11 @@ jobs:
           node --experimental-default-type=module drift-spatial.test.mjs
           node --experimental-default-type=module drift-visuals.test.mjs
           node --experimental-default-type=module drift-audio.test.mjs
+          node --experimental-default-type=module drift-free-tools.test.mjs
       - name: Install pinned browser dependencies
-        run: npm install --no-save --no-package-lock three@0.160.0 @playwright/test@1.51.1 @dimforge/rapier3d-compat@0.12.0
+        run: npm install --no-save --no-package-lock three@0.160.0 @playwright/test@1.51.1 @dimforge/rapier3d-compat@0.12.0 gltf-validator@2.0.0-dev.3.10
+      - name: Validate bundled 3D models
+        run: node tools/validate-drift-assets.mjs
       - run: npx playwright install --with-deps chromium
       - name: Run browser checks
         run: |
