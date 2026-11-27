@@ -1,0 +1,24 @@
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+export function engineMix({speed=0,gas=0,slip=0,exhaust=0,loose=false}={}){
+ speed=clamp(Math.abs(speed)||0,0,100);gas=clamp(gas||0,0,1);slip=clamp(Math.abs(slip)||0,0,1.5);exhaust=clamp(Math.floor(exhaust)||0,0,3);
+ let limits=[0,12,23,36,50,68,90],gear=1;while(gear<6&&speed>limits[gear])gear++;
+ let rpm=clamp(850+((speed-limits[gear-1])/Math.max(1,limits[gear]-limits[gear-1]))*5300+gas*1100,850,7400);
+ let frequency=clamp(rpm/60*[1.9,1.7,2.1,2.3][exhaust],35,330);
+ return {frequency,rpm,gear,level:Math.min(.55,.105+gas*.23+Math.min(speed/55,1)*.11),cutoff:350+frequency*5+gas*850,tyres:speed>5?Math.min(.23,Math.max(0,slip-.09)*.42):0,gravel:loose&&speed>2?Math.min(.19,speed*.009):0,wind:Math.min(.09,speed*.0017)}
+}
+export class DriftAudio{
+ constructor(){const C=window.AudioContext||window.webkitAudioContext;if(!C)throw Error('Web Audio unavailable');this.ac=new C();let a=this.ac;
+ this.master=a.createGain();this.master.gain.value=0;this.limiter=a.createDynamicsCompressor();Object.assign(this.limiter.threshold,{value:-12});this.limiter.knee.value=18;this.limiter.ratio.value=6;this.limiter.attack.value=.004;this.limiter.release.value=.16;this.master.connect(this.limiter).connect(a.destination);
+ this.buffer=a.createBuffer(1,a.sampleRate*2,a.sampleRate);let noise=this.buffer.getChannelData(0);for(let i=0;i<noise.length;i++)noise[i]=Math.random()*2-1;
+ this.engine=this.voice();this.rivals=Array.from({length:3},()=>this.voice(true));this.tyres=this.noise(1300,'bandpass',1.2);this.gravel=this.noise(470,'bandpass',.65);this.wind=this.noise(750,'lowpass',.6);this.last=0;this.lastGas=0;this.lastGear=1;this.lastPop=-10;this.live=false;this.volume=1;
+ }
+ voice(remote=false){let a=this.ac,osc=a.createOscillator(),bass=a.createOscillator(),g=a.createGain(),f=a.createBiquadFilter(),low=a.createGain();let real=new Float32Array(13),imag=new Float32Array([0,1,.48,.36,.20,.20,.11,.12,.065,.08,.04,.05,.025]);osc.setPeriodicWave(a.createPeriodicWave(real,imag));bass.type='triangle';low.gain.value=.38;bass.connect(low).connect(f);osc.connect(f);f.type='lowpass';f.Q.value=.65;g.gain.value=0;f.connect(g);let pan=a.createStereoPanner?a.createStereoPanner():null;if(pan)g.connect(pan).connect(this.master);else g.connect(this.master);osc.start();bass.start();return {osc,bass,f,g,pan,remote}}
+ noise(hz,type,q){let a=this.ac,src=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();src.buffer=this.buffer;src.loop=true;f.type=type;f.frequency.value=hz;f.Q.value=q;g.gain.value=0;src.connect(f).connect(g).connect(this.master);src.start();return {src,f,g}}
+ resume(){this.ac.resume().catch(()=>{})}
+ set(v,m,when=.07){v.setTargetAtTime(m,this.ac.currentTime,when)}
+ update(s,enabled,volume,rivals=[]){let now=this.ac.currentTime,live=!!enabled;this.volume=clamp(Number(volume)||0,0,1.5);if(live!==this.live||this.lastVolume!==this.volume){this.set(this.master.gain,live?this.volume:0,.055);this.live=live;this.lastVolume=this.volume}if(!live){this.lastGas=0;return}if(now-this.last<1/35)return;this.last=now;let m=engineMix(s),v=this.engine;this.set(v.osc.frequency,m.frequency);this.set(v.bass.frequency,m.frequency*.5);this.set(v.f.frequency,m.cutoff);this.set(v.g.gain,m.level);this.set(this.tyres.g.gain,m.tyres);this.set(this.tyres.f.frequency,950+Math.abs(s.speed)*19);this.set(this.gravel.g.gain,m.gravel);this.set(this.wind.g.gain,m.wind);
+ if((this.lastGas>.8&&s.gas<.15&&m.rpm>2400||m.gear>this.lastGear&&s.gas>.6)&&now-this.lastPop>.32){this.pop(.10,100);this.lastPop=now}this.lastGas=s.gas;this.lastGear=m.gear;
+ for(let i=0;i<this.rivals.length;i++){let q=rivals[i],v=this.rivals[i];if(!q){this.set(v.g.gain,0);continue}let m=engineMix({speed:q.speed,gas:.8,exhaust:i%4});this.set(v.osc.frequency,m.frequency*clamp(q.doppler||1,.8,1.2));this.set(v.bass.frequency,m.frequency*.5);this.set(v.f.frequency,m.cutoff*.75);this.set(v.g.gain,.16*clamp(1-q.distance/65,0,1)**2);if(v.pan)this.set(v.pan.pan,clamp(q.pan,-1,1))}
+ }
+ pop(level=.12,freq=95){if(!this.live||this.ac.state!=='running')return;let a=this.ac,t=a.currentTime,o=a.createOscillator(),g=a.createGain(),n=a.createBufferSource(),f=a.createBiquadFilter(),ng=a.createGain();o.type='triangle';o.frequency.setValueAtTime(freq,t);o.frequency.exponentialRampToValueAtTime(35,t+.13);g.gain.setValueAtTime(level,t);g.gain.exponentialRampToValueAtTime(.001,t+.16);o.connect(g).connect(this.master);n.buffer=this.buffer;f.type='bandpass';f.frequency.value=650;ng.gain.setValueAtTime(level*.65,t);ng.gain.exponentialRampToValueAtTime(.001,t+.10);n.connect(f).connect(ng).connect(this.master);o.start(t);n.start(t,Math.random());o.stop(t+.18);n.stop(t+.13);o.onended=()=>{o.disconnect();g.disconnect()};n.onended=()=>{n.disconnect();f.disconnect();ng.disconnect()}}
+}
