@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {adaptiveScale,gamepadControls,mergeControls} from './drift-free-tools.js';
+assert.equal(adaptiveScale(1,20,60),.9);
+assert.equal(adaptiveScale(.6,15,60),.6);
+assert.equal(adaptiveScale(.8,62,60),.85);
+assert.equal(adaptiveScale(1,120,60),1);
+assert.equal(adaptiveScale(.8,55,60),.8);
+let empty=gamepadControls(null);assert.equal(empty.gas,0);assert.equal(empty.steer,0);
+let p=gamepadControls({axes:[.75],buttons:Array.from({length:16},(_,i)=>({value:i===7?.8:i===6?.2:i===0?1:0,pressed:i===0}))});
+assert.equal(p.gas,.8);assert.equal(p.brake,.2);assert.ok(p.steer>.5&&p.steer<.75);assert.equal(p.hand,true);
+assert.equal(gamepadControls({axes:[.08],buttons:[]}).steer,0);
+assert.equal(gamepadControls({axes:[-1],buttons:[]}).steer,-1);
+let c=mergeControls({gas:1,brake:0,steer:-1,hand:false},p);assert.equal(c.gas,1);assert.equal(c.steer,-1);assert.equal(c.hand,true);
+console.log('Free-tools regressions passed');
