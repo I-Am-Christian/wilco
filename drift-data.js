@@ -43,12 +43,16 @@ export function drive(s,c,b,input,dt,mu,assist){
  // Rear grip breaks progressively with the handbrake or power at substantial slip.
  let oldSlip=Math.atan2(v,Math.max(.5,Math.abs(u))),powerSlide=gas>.92&&vel>12&&Math.abs(input.steer)>.90&&Math.abs(s.steer)>.12;
  // Normal cornering does not initiate a sustained drift. Handbrake is the primary trigger.
- let slideTarget=hand&&vel>5?.87:powerSlide?.065:0;
+ let initiated=hand&&vel>6&&Math.abs(input.steer)>.16;
+ // Keep rear grip loose for a short, controllable period after an intentional handbrake entry.
+ s.driftHold=initiated?.95:Math.max(0,(s.driftHold||0)-dt*(gas>.3?1:2.8));
+ let linked=s.driftHold>0&&vel>6&&gas>.25&&Math.abs(oldSlip)>.10;
+ let slideTarget=initiated?.83:linked?.46:powerSlide?.065:0;
  s.slide=damp(s.slide||0,slideTarget,slideTarget>(s.slide||0)?6:7.8+help*4);
  let ideal=u/L*Math.tan(s.steer),turnLimit=grip*g/Math.max(3,vel),yawTarget=clamp(ideal,-turnLimit*(1.10+s.slide*1.30),turnLimit*(1.10+s.slide*1.30));
  // Stability assistance opposes excess rotation, not deliberate steering.
  if(Math.abs(input.steer)<.05&&!hand)yawTarget=0;
- if(!hand&&Math.abs(oldSlip)>.14)yawTarget+=clamp(oldSlip*(1.2+help*2.0),-.75,.75);
+ if(!hand&&Math.abs(oldSlip)>.14)yawTarget+=clamp(oldSlip*(linked?.55+help*.85:1.2+help*2.0),-.75,.75);
  s.r=damp(s.r||0,clamp(yawTarget,-2.2,2.2),10+help*5);
  let nextYaw=s.yaw+s.r*dt;
  let speed=vel+acceleration*dt*Math.sign(u||1);
@@ -69,4 +73,4 @@ export function drive(s,c,b,input,dt,mu,assist){
  s.x+=s.vx*dt;s.z+=s.vz*dt;let ns=Math.sin(nextYaw),nc=Math.cos(nextYaw);
  s.speed=s.vx*ns+s.vz*nc;s.slip=Math.atan2(Math.abs(s.vx*nc-s.vz*ns),Math.max(.5,Math.abs(s.speed)));s.ax=damp(s.ax||0,acceleration,8);return s
 }
-export function driftRate(speed,angle,chain,onRoad){return onRoad&&speed>7&&angle>.14&&angle<1.20?Math.min(75,speed)*Math.sin(angle)*Math.min(4,1+chain/5)*7:0}
+export function driftRate(speed,angle,chain,onRoad){if(!onRoad||speed<6.5||angle<.13||angle>1.20)return 0;let quality=clamp(1-Math.abs(angle-.59)*.7,.58,1),mult=Math.min(5,1+chain/4);return Math.min(65,speed)*Math.sin(angle)*mult*quality*13}
