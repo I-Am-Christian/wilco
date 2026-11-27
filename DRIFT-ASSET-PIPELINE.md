@@ -29,3 +29,24 @@ python3 -m http.server 8765
 npx playwright test tests/drift-browser.spec.mjs --workers=1
 ```
 No claim of successful live rendering until browser checks have completed. Manual multiplayer, model aesthetics, and performance checks remain required.
+
+
+## V17 — Free development extensions
+- Adaptive resolution: enabled by default; changes render resolution between 60% and 100% of the selected preset in 3-second windows, without changing the physics simulation. Turn it off for fixed resolution.
+- Performance monitor: optional Three.js Stats.js FPS/frame-time panel (click to switch displays).
+- FXAA: anti-aliasing at the end of the advanced SSAO/bloom pipeline. The existing standard renderer remains available.
+- Standard-mapped controller: left stick, RT gas, LT brake, A handbrake, Y camera, X recover. Keyboard/touch remain available.
+- Khronos glTF Validator: validates bundled GLBs in CI and accepts individual files locally.
+- glTF Transform: optional offline mesh optimization retaining separate wheel nodes.
+- Context7: free-tier documentation plugin, requires account holder installation; not required to play.
+
+Run from repository root:
+```sh
+npm install --no-save --no-package-lock gltf-validator@2.0.0-dev.3.10
+node tools/validate-drift-assets.mjs
+node tools/validate-drift-assets.mjs my-car.glb
+# Compress to a NEW file (no overwrite)
+npx --yes --package @gltf-transform/cli@4.5.1 gltf-transform meshopt my-car.glb my-car-optimized.glb --level medium
+node tools/validate-drift-assets.mjs my-car-optimized.glb
+```
+The optimizer and validator require npm packages downloaded to the development computer. No paid APIs or subscription required. Hosted free-tier services may have quotas. Browser rendering, controller hardware and external package execution still need verification.
